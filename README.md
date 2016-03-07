@@ -219,3 +219,60 @@ $	rosrun rosserial_xbee xbee_network.py /dev/ttyUSB0 1 2
 ## Servo driver
 
 16-Channel 12-bit PWM/Servo Driver http://adafru.it/815
+
+## Transforms
+
+(tutorial is modified form of wiki.ros.org)
+
+Each robotic component has a unique position within the global map, translating between these positions is done via transforms. In ROS the `tf` package is the standard for keeping track of the changing coordinates. For example, translating between end effector coordinate to the visual sensor stream coordinate requires the use of a transform (e.g (x1, y1, z1) --> (x2, y2, z2)).
+
+
+First, lets change directory to the highest catkin workspace and create a new package with a generic name like "robot setup transform," let's give it the dependecies `tf`, `roscpp`, and `geometry_msgs`
+
+```
+$	cd ros_workspace/src
+$	catkin_create_pkg robot_setup_tf tf roscpp geometry_msgs
+```
+
+### Creating the Transform Broadcaster (Publisher)
+
+In the `robot_setup_tf` package that was just created lets edit the `robot_setup_tf/src/tf_broadcaster.cpp` file that was created.
+
+We want,
+
+```
+# include <ros/ros.h>
+# include <tf/transform_broadcaster.h>
+```
+
+This calls on the `ros` header as well as the `transform_broadcaster`, ros provides the transform broadcaster to simplify the work of broadcasting transforms.
+
+```
+	int main(int argc, char** argv){
+		ros::int(argc, argv, "robot_tf_publisher");
+		ros::NodeHandle n; 
+		ros::Rate r(100); \\ 100 Hz
+```
+
+This is just the standard main opener for cpp, along with the ros initialization of the `robot_tf_publisher` node. The NodeHandle opens communication access and when it is shut down, the node will shut down.
+
+The `ros::Rate` attempts to set the hertz, or times per second, for the loop's activation.
+
+```
+	tf::TransformBroadcaster broadcaster;
+	
+	while(n.ok()){
+		broadcaster.sendTransform(
+		  tf::StampedTransform(
+		    tf::Transform(tf::Quaternion(0, 0, 0, 1), tf::Vector3(0.0, 0.0, 0.0)), ros::Time::now(),"end_effector_odom", 					"kinect_optics"));
+		  r.sleep();
+		  }
+		 }
+
+```
+
+In the final bit of code, we declare the `TransformBroadcaster` object to send our messages across the network. Then we run a loop while the node `n` is "ok." This means it has not been shutdown or received the SIGINT. The loop then uses our broadcaster `TransformerBroadcaster` to send out our transforms. However, we must finally define the features of this transform. 
+
+The first feature of the five features of the transform is the angular variation between the coordinates which is resolved using the Quaternion(pitch, roll, yaw) function, then a three vector(x, y, z) function which represents the vector of displacement from one origin of a coordinate system to another, a function giving the current time at which the transform is applicable, and then the parent to child relationship of the file going from the end effector's frame to the frame of the kinect. Finally, we tell the loop to `r.sleep()`. This tells the function to sleep during the time not required by the rate set earlier.
+
+
