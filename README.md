@@ -264,7 +264,7 @@ The `ros::Rate` attempts to set the hertz, or times per second, for the loop's a
 	while(n.ok()){
 		broadcaster.sendTransform(
 		  tf::StampedTransform(
-		    tf::Transform(tf::Quaternion(0, 0, 0, 1), tf::Vector3(0.0, 0.0, 0.0)), ros::Time::now(),"end_effector_odom", 					"kinect_optics"));
+		    tf::Transform(tf::Quaternion(0, 0, 0, 1), tf::Vector3(0.0, 0.0, 0.0)), ros::Time::now(),"End_Effector_Odom", "Kinect_PointCloud"));
 		  r.sleep();
 		  }
 		 }
@@ -274,5 +274,92 @@ The `ros::Rate` attempts to set the hertz, or times per second, for the loop's a
 In the final bit of code, we declare the `TransformBroadcaster` object to send our messages across the network. Then we run a loop while the node `n` is "ok." This means it has not been shutdown or received the SIGINT. The loop then uses our broadcaster `TransformerBroadcaster` to send out our transforms. However, we must finally define the features of this transform. 
 
 The first feature of the five features of the transform is the angular variation between the coordinates which is resolved using the Quaternion(pitch, roll, yaw) function, then a three vector(x, y, z) function which represents the vector of displacement from one origin of a coordinate system to another, a function giving the current time at which the transform is applicable, and then the parent to child relationship of the file going from the end effector's frame to the frame of the kinect. Finally, we tell the loop to `r.sleep()`. This tells the function to sleep during the time not required by the rate set earlier.
+
+### Using the Transform (Subscribing) (To be edited - needs comments)
+
+This section of the ReadMe explains the setting up of the transform subscribers.
+
+```
+#include <ros/ros.h>
+#include <geometry_msgs/twist.h>
+#include <sensor_msgs/pointcloud.h>
+#include <tf/transform_listener.h>
+
+void transformPoint(const tf::TransformListener& listener){
+  //we'll create a point in the Kinect_PointCloud frame that we'd like to transform to the End_Effector_Odom frame
+  sensor_msgs::PointCloud kinect_point;
+  kinect_point.header.frame_id = "Kinect_PointCloud";
+
+  //we'll just use the most recent transform available for our simple example
+  kinect_point.header.stamp = ros::Time();
+
+  //just an arbitrary point in space
+  kinect_point.point.x = 1.0;
+  kinect_point.point.y = 0.2;
+  kinect_point.point.z = 0.0;
+
+  try{
+    geometry_msgs::Twist end_effector;
+    listener.transformPoint("end_effector_odom", kinect_point, end_effector);
+
+    ROS_INFO("base_kinect: (%.2f, %.2f. %.2f) -----> base_link: (%.2f, %.2f, %.2f) at time %.2f",
+        kinect_point.point.x, kinect_point.point.y, kinect_point.point.z,
+        end_effector.point.x, end_effector.point.y, end_effector.point.z, end_effector.header.stamp.toSec());
+  }
+  catch(tf::TransformException& ex){
+    ROS_ERROR("Received an exception trying to transform a point from \"Kinect_PointCloud\" to \"End_Effector_Odom\": %s", ex.what());
+  }
+}
+
+int main(int argc, char** argv){
+  ros::init(argc, argv, "robot_tf_listener");
+  ros::NodeHandle n;
+
+  tf::TransformListener listener(ros::Duration(10));
+
+  //we'll transform a point once every second
+  ros::Timer timer = n.createTimer(ros::Duration(1.0), boost::bind(&transformPoint, boost::ref(listener)));
+
+  ros::spin();
+
+}
+```
+
+
+### Building the Code (To be editted)
+
+This section creates the code that was written in the subscriber and publisher files.
+
+```
+add_executable(tf_broadcaster src/tf_broadcaster.cpp)
+add_executable(tf_listener src/tf_listener.cpp)
+target_link_libraries(tf_broadcaster ${catkin_LIBRARIES})
+target_link_libraries(tf_listener ${catkin_LIBRARIES})
+```
+
+```
+$ cd ros_workspace
+$ catkin_make
+```
+
+```
+roscore
+```
+
+```
+rosrun robot_setup_tf tf_broadcaster
+```
+
+```
+rosrun robot_setup_tf tf_listener
+```
+
+```
+[ INFO] 1248138528.200823000: base_laser: (1.00, 0.20. 0.00) -----> base_link: (1.10, 0.20, 0.20) at time 1248138528.19
+[ INFO] 1248138529.200820000: base_laser: (1.00, 0.20. 0.00) -----> base_link: (1.10, 0.20, 0.20) at time 1248138529.19
+[ INFO] 1248138530.200821000: base_laser: (1.00, 0.20. 0.00) -----> base_link: (1.10, 0.20, 0.20) at time 1248138530.19
+[ INFO] 1248138531.200835000: base_laser: (1.00, 0.20. 0.00) -----> base_link: (1.10, 0.20, 0.20) at time 1248138531.19
+[ INFO] 1248138532.200849000: base_laser: (1.00, 0.20. 0.00) -----> base_link: (1.10, 0.20, 0.20) at time 1248138532.19
+```
 
 
