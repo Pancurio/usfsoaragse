@@ -281,7 +281,7 @@ This section of the ReadMe explains the setting up of the transform subscribers.
 
 ```
 #include <ros/ros.h>
-#include <geometry_msgs/twist.h>
+#include <nav_msgs/odometry.h>
 #include <sensor_msgs/pointcloud.h>
 #include <tf/transform_listener.h>
 
@@ -299,7 +299,7 @@ void transformPoint(const tf::TransformListener& listener){
   kinect_point.point.z = 0.0;
 
   try{
-    geometry_msgs::Twist end_effector;
+    nav_msgs::Odometry end_effector;
     listener.transformPoint("end_effector_odom", kinect_point, end_effector);
 
     ROS_INFO("base_kinect: (%.2f, %.2f. %.2f) -----> base_link: (%.2f, %.2f, %.2f) at time %.2f",
