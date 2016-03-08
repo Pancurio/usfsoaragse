@@ -222,8 +222,6 @@ $	rosrun rosserial_xbee xbee_network.py /dev/ttyUSB0 1 2
 
 ## Transforms
 
-(tutorial is modified form of wiki.ros.org)
-
 Each robotic component has a unique position within the global map, translating between these positions is done via transforms. In ROS the `tf` package is the standard for keeping track of the changing coordinates. For example, translating between end effector coordinate to the visual sensor stream coordinate requires the use of a transform (e.g (x1, y1, z1) --> (x2, y2, z2)).
 
 
@@ -284,7 +282,11 @@ This section of the ReadMe explains the setting up of the transform subscribers.
 #include <nav_msgs/odometry.h>
 #include <sensor_msgs/pointcloud.h>
 #include <tf/transform_listener.h>
+```
 
+Here, we bring in the tools we will be using, ros itself, the messages to be sent and the `tf/transform_listener.h` to aid us creating a subscriber to the `tf` topic.
+
+```
 void transformPoint(const tf::TransformListener& listener){
   //we'll create a point in the Kinect_PointCloud frame that we'd like to transform to the End_Effector_Odom frame
   sensor_msgs::PointCloud kinect_point;
@@ -326,9 +328,11 @@ int main(int argc, char** argv){
 ```
 
 
-### Building the Code (To be editted)
+### Building the Code (To be edited)
 
 This section creates the code that was written in the subscriber and publisher files.
+
+We need to open to our CMakeLists.txt file that was created when we used roscreate-pkg and append the following onto the last line:
 
 ```
 add_executable(tf_broadcaster src/tf_broadcaster.cpp)
@@ -337,22 +341,27 @@ target_link_libraries(tf_broadcaster ${catkin_LIBRARIES})
 target_link_libraries(tf_listener ${catkin_LIBRARIES})
 ```
 
+This activates the appropriate code at runtime and links their libraries to required libraries.
+
 ```
 $ cd ros_workspace
 $ catkin_make
 ```
 
+`catkin_make` the package.
+
 ```
 roscore
 ```
 
-```
-rosrun robot_setup_tf tf_broadcaster
-```
+Run ros.
 
 ```
+rosrun robot_setup_tf tf_broadcaster
 rosrun robot_setup_tf tf_listener
 ```
+
+Initialize our publisher and subscriber.
 
 ```
 [ INFO] 1248138528.200823000: base_laser: (1.00, 0.20. 0.00) -----> base_link: (1.10, 0.20, 0.20) at time 1248138528.19
@@ -362,4 +371,150 @@ rosrun robot_setup_tf tf_listener
 [ INFO] 1248138532.200849000: base_laser: (1.00, 0.20. 0.00) -----> base_link: (1.10, 0.20, 0.20) at time 1248138532.19
 ```
 
+Listen.
 
+## Odometry
+
+The odometry of a robotic component details the angular and linear position, velocity, and acceleration of that component. This allows the component to be mapped against a global frame.
+
+### Odometry Transform
+
+The odometry transform allows us to publish the odometry information in the kinect's frame, yielding efficient correspondence with the component's visual position. 
+
+```
+#include <ros/ros.h>
+#include <tf/transform_broadcaster.h>
+#include <nav_msgs/Odometry.h>
+```
+
+Above we have included ros, as well as our old friend transform broadcaster, and since we will be publishing `nav_msgs/Odometry` we will need to include the relevant header file.
+
+```
+int main(int argc, char** argv){
+  ros::init(argc, argv, "odometry_publisher");
+
+  ros::NodeHandle n;
+  ```
+  
+In the previous section we are initializing our standard main c++ loop as well as creating a new ros node called `odometry_publisher`. We then open communication with the node using `NodeHandle`.
+  
+  ```
+  ros::Publisher odom_pub = n.advertise<nav_msgs::Odometry>("odom", 50);
+  tf::TransformBroadcaster odom_broadcaster;
+```
+
+Here we have created a ros publisher and a `TransformBroadcaster` for our odometry information to be sent out on the ros network.
+
+```
+  double x = 0.0;
+  double y = 0.0;
+  double th = 0.0;
+```
+
+Above we set our initial component to origin in the component's local frame.
+
+```
+  double vx = 0.1;
+  double vy = -0.1;
+  double vth = 0.1;
+```
+
+Above is dummy code to make a fake robot drive in a circle, this will need to be replaced with a further section on encoder feedback reading, preferably with and without interrupts, as well as once the hardware is interfaced.
+
+```
+  ros::Time current_time, last_time;
+  current_time = ros::Time::now();
+  last_time = ros::Time::now();
+
+  ros::Rate r(500.0);
+  ```
+  
+Here we have a few lines relating to the timing of the program. We declare two new variables and assign them to the current time. Additionally we set the rate of our odometry publishing to be 500 Hz.
+  
+  ```
+  while(n.ok()){
+
+    ros::spinOnce();               // check for incoming messages
+    current_time = ros::Time::now();
+```
+
+While the node is in an okay state, lets use `spinOnce()` to check for any outstanding callbacks. Then lets update the current time variable to account for how long that callback may have taken.
+
+```
+    //compute odometry in a typical way given the velocities of the robot
+    double dt = (current_time - last_time).toSec();
+    double delta_x = (vx * cos(th) - vy * sin(th)) * dt;
+    double delta_y = (vx * sin(th) + vy * cos(th)) * dt;
+    double delta_th = vth * dt;
+
+    x += delta_x;
+    y += delta_y;
+    th += delta_th;
+```
+
+Lets compute the changes in our variables using a standard approach. We would want our updating velocities to input into these variables for the expression of change.
+
+```
+    //since all odometry is 6DOF we'll need a quaternion created from yaw
+    geometry_msgs::Quaternion odom_quat = tf::createQuaternionMsgFromYaw(th);
+```
+
+To smoothly handle 3D information we use Quaternions.
+
+```
+    //first, we'll publish the transform over tf
+    geometry_msgs::TransformStamped odom_trans;
+    odom_trans.header.stamp = current_time;
+    odom_trans.header.frame_id = "odom";
+    odom_trans.child_frame_id = "end_effector_odom";
+```
+
+Above we publish the information over tf, stamping it with the time and frames.
+
+```
+    odom_trans.transform.translation.x = x;
+    odom_trans.transform.translation.y = y;
+    odom_trans.transform.translation.z = 0.0;
+    odom_trans.transform.rotation = odom_quat;
+
+    //send the transform
+    odom_broadcaster.sendTransform(odom_trans);
+```
+
+In the above passage we set the transform odometry to the current odometry and publish it using our broadcaster from earlier.
+
+```
+    //next, we'll publish the odometry message over ROS
+    nav_msgs::Odometry odom;
+    odom.header.stamp = current_time;
+    odom.header.frame_id = "odom";
+```
+
+Now we want to publish the odometry over ros so we create the `odom` navagation message and stamp it's header with the current time and the frame it is coming from.
+
+```
+    //set the position
+    odom.pose.pose.position.x = x;
+    odom.pose.pose.position.y = y;
+    odom.pose.pose.position.z = 0.0;
+    odom.pose.pose.orientation = odom_quat;
+
+    //set the velocity
+    odom.child_frame_id = "end_effector_odom";
+    odom.twist.twist.linear.x = vx;
+    odom.twist.twist.linear.y = vy;
+    odom.twist.twist.angular.z = vth;
+
+    //publish the message
+    odom_pub.publish(odom);
+```
+
+Finally, we fill in the ros message with the odometry data and publish it on the network.
+
+```
+    last_time = current_time;
+    r.sleep();
+  }
+}
+```
+End the program and let the rate fill in the time gaps with the appropriate Hz.
