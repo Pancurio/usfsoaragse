@@ -218,7 +218,48 @@ $	rosrun rosserial_xbee xbee_network.py /dev/ttyUSB0 1 2
 ```
 ## Servo driver
 
-16-Channel 12-bit PWM/Servo Driver http://adafru.it/815
+We will be using the 16-Channel 12-bit PWM/Servo Driver (http://adafru.it/815). Assuming you have the I^2C hooked up correctly between the pi and the board, download the Adafruit PWM Servo Driver library.
+
+```
+ git clone https://github.com/adafruit/Adafruit-Raspberry-Pi-Python-Code.git
+ cd Adafruit-Raspberry-Pi-Python-Code
+ cd Adafruit_PWM_Servo_Driver 
+```
+
+The code should autodetect the I2C address, if it does not either change the section in the code or refer to https://learn.adafruit.com/adafruit-16-channel-servo-driver-with-raspberry-pi/ for further instructions on locating the I2C address and/or resolving errors.
+
+The servos can now be reached in the format of setPWM(self, channel, on, off). The channel is the 16 channels of the servo driver addressed from 0-15. The on and off sets a duty cycle through "ticks" on the pulse from 0 - 4095. An example of this is,
+
+```
+ pwm.setPWM(15, 1024, 3072)
+```
+
+This will activate the 16th servo at tick 1024 and deactivate it at tick 3072, giving a 50% duty cycle activating on the first quarter of the pulse and deactivating on the third quarter. 
+
+## Arm Navigation (Moveit!)
+
+ If the installation of ROS was a base installation or to download it again follow the code below.
+ 
+ ```
+ source /opt/ros/indigo/setup.bash
+mkdir moveit
+cd moveit
+mkdir src
+cd src/
+wstool init .
+wstool merge https://raw.github.com/ros-planning/moveit_docs/indigo-devel/moveit.rosinstall
+wstool update
+cd ..
+```
+
+Then ensure you have the proper dependencies.
+
+```
+rosdep install --from-paths src --ignore-src --rosdistro indigo -y
+```
+
+Tutorials can be found at: http://moveit.ros.org/documentation/tutorials/
+
 
 ## Transforms
 
@@ -364,11 +405,11 @@ rosrun robot_setup_tf tf_listener
 Initialize our publisher and subscriber.
 
 ```
-[ INFO] 1248138528.200823000: base_laser: (1.00, 0.20. 0.00) -----> base_link: (1.10, 0.20, 0.20) at time 1248138528.19
-[ INFO] 1248138529.200820000: base_laser: (1.00, 0.20. 0.00) -----> base_link: (1.10, 0.20, 0.20) at time 1248138529.19
-[ INFO] 1248138530.200821000: base_laser: (1.00, 0.20. 0.00) -----> base_link: (1.10, 0.20, 0.20) at time 1248138530.19
-[ INFO] 1248138531.200835000: base_laser: (1.00, 0.20. 0.00) -----> base_link: (1.10, 0.20, 0.20) at time 1248138531.19
-[ INFO] 1248138532.200849000: base_laser: (1.00, 0.20. 0.00) -----> base_link: (1.10, 0.20, 0.20) at time 1248138532.19
+[ INFO] 1248138528.200823000: base_kinect: (1.00, 0.20. 0.00) -----> base_link: (1.10, 0.20, 0.20) at time 1248138528.19
+[ INFO] 1248138529.200820000: base_kinect: (1.00, 0.20. 0.00) -----> base_link: (1.10, 0.20, 0.20) at time 1248138529.19
+[ INFO] 1248138530.200821000: base_kinect: (1.00, 0.20. 0.00) -----> base_link: (1.10, 0.20, 0.20) at time 1248138530.19
+[ INFO] 1248138531.200835000: base_kinect: (1.00, 0.20. 0.00) -----> base_link: (1.10, 0.20, 0.20) at time 1248138531.19
+[ INFO] 1248138532.200849000: base_kinect: (1.00, 0.20. 0.00) -----> base_link: (1.10, 0.20, 0.20) at time 1248138532.19
 ```
 
 Listen.
